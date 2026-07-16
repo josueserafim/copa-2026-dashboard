@@ -36,21 +36,6 @@ st.markdown("""
         border-radius: 10px;
         margin-bottom: 30px;
     }
-    .explicacao {
-        background-color: #1a1f3a;
-        border-left: 4px solid #667eea;
-        padding: 15px;
-        margin-top: 20px;
-        border-radius: 5px;
-        font-size: 14px;
-        line-height: 1.6;
-        color: #d0d0d0;
-    }
-    .titulo-explicacao {
-        color: #667eea;
-        font-weight: bold;
-        margin-bottom: 8px;
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -242,16 +227,17 @@ if client:
                             delta=f"Brasil: {impacto_brasil[0]:.1f}%"
                         )
             
-            # Explicação dos KPIs
-            st.markdown("""
-                <div class="explicacao">
-                    <div class="titulo-explicacao">Como ler os indicadores:</div>
-                    <strong>Impacto Médio:</strong> Variação percentual média dos acessos durante todos os jogos analisados. Valores positivos = mais usuários, negativos = menos usuários.<br><br>
-                    <strong>Total de Jogos:</strong> Quantidade total de partidas da Copa 2026 que tiveram seus dados analisados.<br><br>
-                    <strong>Jogos do Brasil:</strong> Número de partidas que o Brasil participou e foram monitoradas.<br><br>
-                    <strong>Diferença Brasil vs Outros:</strong> Comparação do impacto médio entre jogos com Brasil e jogos entre outros países.
-                </div>
-            """, unsafe_allow_html=True)
+            # Explicação dos KPIs (Dropdown)
+            with st.expander("📖 Como ler os indicadores", expanded=False):
+                st.markdown("""
+                **Impacto Médio:** Variação percentual média dos acessos durante todos os jogos analisados. Valores positivos = mais usuários, negativos = menos usuários.
+
+                **Total de Jogos:** Quantidade total de partidas da Copa 2026 que tiveram seus dados analisados.
+
+                **Jogos do Brasil:** Número de partidas que o Brasil participou e foram monitoradas.
+
+                **Diferença Brasil vs Outros:** Comparação do impacto médio entre jogos com Brasil e jogos entre outros países.
+                """)
             
             st.divider()
             
@@ -315,16 +301,19 @@ if client:
                 
                 st.plotly_chart(fig_barras, use_container_width=True)
                 
-                # Explicação do gráfico
-                st.markdown("""
-                    <div class="explicacao">
-                        <div class="titulo-explicacao">Como ler este gráfico:</div>
-                        <strong>Eixo Horizontal (Variação %):</strong> Mostra a variação percentual de usuários durante o jogo. Valores positivos indicam AUMENTO de acessos, negativos indicam DIMINUIÇÃO.<br><br>
-                        <strong>Cores:</strong> Amarelo = Jogos com Brasil | Azul = Jogos entre outros países.<br><br>
-                        <strong>Barra mais longa:</strong> Maior impacto (positivo ou negativo) nos acessos à plataforma.<br><br>
-                        <strong>Interatividade:</strong> Passe o mouse sobre as barras para ver data, hora, fase e número de usuários.
-                    </div>
-                """, unsafe_allow_html=True)
+                # Explicação do gráfico (Dropdown)
+                with st.expander("📖 Como ler este gráfico", expanded=False):
+                    st.markdown("""
+                    **Eixo Horizontal (Variação %):** Mostra a variação percentual de usuários durante o jogo. Valores positivos indicam AUMENTO de acessos, negativos indicam DIMINUIÇÃO.
+
+                    **Cores:** 
+                    - 🟨 Amarelo = Jogos com Brasil
+                    - 🔵 Azul = Jogos entre outros países
+
+                    **Barra mais longa:** Maior impacto (positivo ou negativo) nos acessos à plataforma.
+
+                    **Interatividade:** Passe o mouse sobre as barras para ver data, hora, fase e número de usuários.
+                    """)
                 
                 # Estatísticas
                 st.markdown("### Estatísticas do Período")
@@ -350,14 +339,16 @@ if client:
                         f"{df_filtrado['variacao_pct'].std():.1f}%"
                     )
                 
-                st.markdown("""
-                    <div class="explicacao">
-                        <div class="titulo-explicacao">O que significam essas métricas:</div>
-                        <strong>Maior Impacto Positivo:</strong> O jogo que MAIS aumentou os acessos à plataforma.<br><br>
-                        <strong>Maior Impacto Negativo:</strong> O jogo que MAIS diminuiu os acessos à plataforma (competição com transmissão).<br><br>
-                        <strong>Desvio Padrão:</strong> Mede a variabilidade dos impactos. Valores altos = impactos muito diferentes entre jogos. Valores baixos = impactos mais consistentes.
-                    </div>
-                """, unsafe_allow_html=True)
+                with st.expander("📖 O que significam essas métricas", expanded=False):
+                    st.markdown("""
+                    **Maior Impacto Positivo:** O jogo que MAIS aumentou os acessos à plataforma.
+
+                    **Maior Impacto Negativo:** O jogo que MAIS diminuiu os acessos à plataforma (competição com transmissão).
+
+                    **Desvio Padrão:** Mede a variabilidade dos impactos. 
+                    - Valores altos = impactos muito diferentes entre jogos
+                    - Valores baixos = impactos mais consistentes
+                    """)
             
             with tab2:
                 st.markdown("### Evolução de Usuários - Série Temporal")
@@ -386,16 +377,20 @@ if client:
                     
                     st.plotly_chart(fig_linha, use_container_width=True)
                     
-                    st.markdown("""
-                        <div class="explicacao">
-                            <div class="titulo-explicacao">Como ler este gráfico:</div>
-                            <strong>Eixo Horizontal (Data):</strong> Período de análise da Copa 2026.<br><br>
-                            <strong>Eixo Vertical (Usuários):</strong> Número de usuários acessando a plataforma naquele dia.<br><br>
-                            <strong>Cores da linha:</strong> Diferentes cores indicam dias com (azul claro) e sem (azul escuro) jogos do Brasil.<br><br>
-                            <strong>Picos e quedas:</strong> Picos = dias com alta demanda (geralmente durante jogos). Quedas = períodos de baixa demanda.<br><br>
-                            <strong>Tendência geral:</strong> A linha mostra se o engajamento está crescendo, caindo ou se mantendo estável ao longo do tempo.
-                        </div>
-                    """, unsafe_allow_html=True)
+                    with st.expander("📖 Como ler este gráfico", expanded=False):
+                        st.markdown("""
+                        **Eixo Horizontal (Data):** Período de análise da Copa 2026.
+
+                        **Eixo Vertical (Usuários):** Número de usuários acessando a plataforma naquele dia.
+
+                        **Cores da linha:** Diferentes cores indicam dias com (azul claro) e sem (azul escuro) jogos do Brasil.
+
+                        **Picos e quedas:** 
+                        - Picos = dias com alta demanda (geralmente durante jogos)
+                        - Quedas = períodos de baixa demanda
+
+                        **Tendência geral:** A linha mostra se o engajamento está crescendo, caindo ou se mantendo estável ao longo do tempo.
+                        """)
                 else:
                     st.info("Sem dados de série temporal disponíveis")
             
@@ -426,15 +421,18 @@ if client:
                     
                     st.plotly_chart(fig_comparacao, use_container_width=True)
                     
-                    st.markdown("""
-                        <div class="explicacao">
-                            <div class="titulo-explicacao">Como ler este gráfico:</div>
-                            <strong>Comparação direta:</strong> Mostra qual tipo de jogo (Brasil ou Outros) tem maior impacto médio nos acessos.<br><br>
-                            <strong>Barra mais alta:</strong> Tipo de jogo com maior impacto médio positivo.<br><br>
-                            <strong>Número de jogos:</strong> Passe o mouse para ver quantos jogos de cada tipo foram analisados.<br><br>
-                            <strong>Interpretação:</strong> Se Brasil tem impacto > Outros = jogos do Brasil geram mais engajamento. Se Outros > Brasil = outros jogos têm mais efeito.
-                        </div>
-                    """, unsafe_allow_html=True)
+                    with st.expander("📖 Como ler este gráfico", expanded=False):
+                        st.markdown("""
+                        **Comparação direta:** Mostra qual tipo de jogo (Brasil ou Outros) tem maior impacto médio nos acessos.
+
+                        **Barra mais alta:** Tipo de jogo com maior impacto médio positivo.
+
+                        **Número de jogos:** Passe o mouse para ver quantos jogos de cada tipo foram analisados.
+
+                        **Interpretação:** 
+                        - Se Brasil > Outros = jogos do Brasil geram mais engajamento
+                        - Se Outros > Brasil = outros jogos têm mais efeito
+                        """)
                     
                     # Tabela comparativa
                     st.markdown("### Detalhes da Comparação")
@@ -464,23 +462,27 @@ if client:
                     height=500
                 )
                 
-                st.markdown("""
-                    <div class="explicacao">
-                        <div class="titulo-explicacao">Explicação das colunas:</div>
-                        <strong>Data/Hora do Jogo:</strong> Quando a partida ocorreu.<br><br>
-                        <strong>Confronto:</strong> Qual foi o jogo (times envolvidos).<br><br>
-                        <strong>Fase:</strong> Etapa da Copa (Grupos, Oitavas, Quartas, etc).<br><br>
-                        <strong>Tipo:</strong> Se foi jogo do Brasil ou de Outros Países.<br><br>
-                        <strong>Usuários Jogo:</strong> Quantidade de usuários durante o horário do jogo.<br><br>
-                        <strong>Usuários Controle:</strong> Usuários no dia anterior (para comparação baseline).<br><br>
-                        <strong>Variação %:</strong> Percentual de diferença entre dia do jogo e dia de controle.
-                    </div>
-                """, unsafe_allow_html=True)
+                with st.expander("📖 Explicação das colunas", expanded=False):
+                    st.markdown("""
+                    **Data/Hora do Jogo:** Quando a partida ocorreu.
+
+                    **Confronto:** Qual foi o jogo (times envolvidos).
+
+                    **Fase:** Etapa da Copa (Grupos, Oitavas, Quartas, etc).
+
+                    **Tipo:** Se foi jogo do Brasil ou de Outros Países.
+
+                    **Usuários Jogo:** Quantidade de usuários durante o horário do jogo.
+
+                    **Usuários Controle:** Usuários no dia anterior (para comparação baseline).
+
+                    **Variação %:** Percentual de diferença entre dia do jogo e dia de controle.
+                    """)
                 
                 # Download CSV
                 csv = df_exibicao.to_csv(index=False)
                 st.download_button(
-                    label="Download CSV",
+                    label="📥 Download CSV",
                     data=csv,
                     file_name=f"copa_2026_analise_{datetime.now().strftime('%Y%m%d')}.csv",
                     mime="text/csv"
