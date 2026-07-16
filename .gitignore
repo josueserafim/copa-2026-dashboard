@@ -1,0 +1,10 @@
+# Credenciais (NÃO fazer upload!)
+credentials.json
+
+# Python
+*.pyc
+__pycache__/
+.env
+
+# Streamlit
+.streamlit/secrets.toml
