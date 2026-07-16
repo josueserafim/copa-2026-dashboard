@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from google.cloud import bigquery
+import json
 
 # ==========================
 # CONFIGURAÇÃO STREAMLIT
@@ -40,9 +41,15 @@ st.markdown("""
 # ==========================
 @st.cache_resource
 def conectar_bigquery():
-    """Conecta ao BigQuery"""
+    """Conecta ao BigQuery usando Secrets do Streamlit"""
     try:
-        return bigquery.Client(project="analytics-bigquery-321918")
+        # Tenta ler do Streamlit Secrets
+        if "gcp_service_account" in st.secrets:
+            creds_dict = dict(st.secrets["gcp_service_account"])
+            return bigquery.Client.from_service_account_info(creds_dict)
+        else:
+            st.error("Secrets não configuradas! Adicione as credenciais do Google Cloud nos Secrets.")
+            return None
     except Exception as e:
         st.error(f"Erro ao conectar BigQuery: {e}")
         return None
@@ -50,72 +57,100 @@ def conectar_bigquery():
 @st.cache_data(ttl=3600)
 def carregar_dados_impacto(_client):
     """Carrega dados de impacto por jogo"""
-    query = """
-    SELECT 
-        data_jogo,
-        hora_jogo,
-        confronto,
-        time_1,
-        time_2,
-        fase,
-        tipo,
-        eh_brasil,
-        usuarios_jogo,
-        usuarios_controle,
-        variacao_pct
-    FROM `analytics-bigquery-321918.ionica_gold.v_copa_impacto_por_jogo`
-    ORDER BY data_jogo
-    """
-    return _client.query(query).to_dataframe()
+    if _client is None:
+        return pd.DataFrame()
+    
+    try:
+        query = """
+        SELECT 
+            data_jogo,
+            hora_jogo,
+            confronto,
+            time_1,
+            time_2,
+            fase,
+            tipo,
+            eh_brasil,
+            usuarios_jogo,
+            usuarios_controle,
+            variacao_pct
+        FROM `analytics-bigquery-321918.ionica_gold.v_copa_impacto_por_jogo`
+        ORDER BY data_jogo
+        """
+        return _client.query(query).to_dataframe()
+    except Exception as e:
+        st.warning(f"Erro ao carregar impacto: {e}")
+        return pd.DataFrame()
 
 @st.cache_data(ttl=3600)
 def carregar_dados_serie_temporal(_client):
     """Carrega série temporal"""
-    query = """
-    SELECT 
-        data,
-        sessoes,
-        usuarios,
-        duracao_media_minutos,
-        jogos_do_dia,
-        fases,
-        tem_jogo_brasil,
-        quantidade_jogos_dia
-    FROM `analytics-bigquery-321918.ionica_gold.v_copa_serie_temporal`
-    ORDER BY data DESC
-    """
-    return _client.query(query).to_dataframe()
+    if _client is None:
+        return pd.DataFrame()
+    
+    try:
+        query = """
+        SELECT 
+            data,
+            sessoes,
+            usuarios,
+            duracao_media_minutos,
+            jogos_do_dia,
+            fases,
+            tem_jogo_brasil,
+            quantidade_jogos_dia
+        FROM `analytics-bigquery-321918.ionica_gold.v_copa_serie_temporal`
+        ORDER BY data DESC
+        """
+        return _client.query(query).to_dataframe()
+    except Exception as e:
+        st.warning(f"Erro ao carregar série temporal: {e}")
+        return pd.DataFrame()
 
 @st.cache_data(ttl=3600)
 def carregar_dados_comparacao(_client):
     """Carrega comparação Brasil vs Outros"""
-    query = """
-    SELECT 
-        tipo_jogo,
-        total_jogos,
-        impacto_medio_pct,
-        desvio_padrao,
-        melhor_resultado,
-        pior_resultado
-    FROM `analytics-bigquery-321918.ionica_gold.v_copa_brasil_vs_outros`
-    """
-    return _client.query(query).to_dataframe()
+    if _client is None:
+        return pd.DataFrame()
+    
+    try:
+        query = """
+        SELECT 
+            tipo_jogo,
+            total_jogos,
+            impacto_medio_pct,
+            desvio_padrao,
+            melhor_resultado,
+            pior_resultado
+        FROM `analytics-bigquery-321918.ionica_gold.v_copa_brasil_vs_outros`
+        """
+        return _client.query(query).to_dataframe()
+    except Exception as e:
+        st.warning(f"Erro ao carregar comparação: {e}")
+        return pd.DataFrame()
 
 @st.cache_data(ttl=3600)
 def carregar_dados_fase(_client):
     """Carrega resumo por fase"""
-    query = """
-    SELECT 
-        fase,
-        total_jogos,
-        impacto_medio_pct,
-        melhor_impacto,
-        pior_impacto,
-        variacao_stddev
-    FROM `analytics-bigquery-321918.ionica_gold.v_copa_resumo_por_fase`
-    ORDER BY impacto_medio_pct DESC
-    """
-    return _client.query(query).to_dataframe()
+    if _client is None:
+        return pd.DataFrame()
+    
+    try:
+        query = """
+        SELECT 
+            fase,
+            total_jogos,
+            impacto_medio_pct,
+            melhor_impacto,
+            pior_impacto,
+            variacao_stddev
+        FROM `analytics-bigquery-321918.ionica_gold.v_copa_resumo_por_fase`
+        ORDER BY impacto_medio_pct DESC
+        """
+        return _client.query(query).to_dataframe()
+    except Exception as e:
+        st.warning(f"Erro ao carregar fase: {e}")
+        return pd.DataFrame()
 
 # ==========================
 # LAYOUT PRINCIPAL
@@ -135,15 +170,15 @@ client = conectar_bigquery()
 
 if client:
     # Carregar dados
-    try:
-        df_impacto = carregar_dados_impacto(client)
-        df_serie = carregar_dados_serie_temporal(client)
-        df_comparacao = carregar_dados_comparacao(client)
-        df_fase = carregar_dados_fase(client)
-        
-        # ==========================
-        # KPI CARDS
-        # ==========================
+    df_impacto = carregar_dados_impacto(client)
+    df_serie = carregar_dados_serie_temporal(client)
+    df_comparacao = carregar_dados_comparacao(client)
+    df_fase = carregar_dados_fase(client)
+    
+    # ==========================
+    # KPI CARDS
+    # ==========================
+    if not df_impacto.empty:
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
@@ -172,16 +207,17 @@ if client:
             )
         
         with col4:
-            impacto_brasil = df_comparacao[df_comparacao['tipo_jogo'] == 'Brasil Joga']['impacto_medio_pct'].values
-            impacto_outros = df_comparacao[df_comparacao['tipo_jogo'] == 'Outros Países']['impacto_medio_pct'].values
-            
-            if len(impacto_brasil) > 0 and len(impacto_outros) > 0:
-                diferenca = abs(impacto_brasil[0] - impacto_outros[0])
-                st.metric(
-                    "Diferença Brasil vs Outros",
-                    f"{diferenca:.1f}%",
-                    delta=f"Brasil: {impacto_brasil[0]:.1f}%"
-                )
+            if not df_comparacao.empty:
+                impacto_brasil = df_comparacao[df_comparacao['tipo_jogo'] == 'Brasil Joga']['impacto_medio_pct'].values
+                impacto_outros = df_comparacao[df_comparacao['tipo_jogo'] == 'Outros Países']['impacto_medio_pct'].values
+                
+                if len(impacto_brasil) > 0 and len(impacto_outros) > 0:
+                    diferenca = abs(impacto_brasil[0] - impacto_outros[0])
+                    st.metric(
+                        "Diferença Brasil vs Outros",
+                        f"{diferenca:.1f}%",
+                        delta=f"Brasil: {impacto_brasil[0]:.1f}%"
+                    )
         
         # ==========================
         # SIDEBAR - FILTROS
@@ -217,10 +253,13 @@ if client:
             df_top = df_filtrado.nlargest(15, 'variacao_pct')
             
             # Gráfico de barras com Streamlit
-            st.bar_chart(
-                data=df_top.set_index('confronto')['variacao_pct'],
-                height=500
-            )
+            if not df_top.empty:
+                st.bar_chart(
+                    data=df_top.set_index('confronto')['variacao_pct'],
+                    height=500
+                )
+            else:
+                st.info("Sem dados para exibir com os filtros selecionados")
             
             # Estatísticas
             col1, col2, col3 = st.columns(3)
@@ -255,7 +294,7 @@ if client:
                     height=500
                 )
             else:
-                st.warning("Sem dados de série temporal disponíveis")
+                st.info("Sem dados de série temporal disponíveis")
         
         with tab3:
             st.markdown("### Brasil vs Outros Países")
@@ -311,11 +350,9 @@ if client:
                 <p>Dados: 102 jogos da Copa 2026 | Análise de impacto em plataforma educacional</p>
             </div>
         """, unsafe_allow_html=True)
-        
-    except Exception as e:
-        st.error(f"Erro ao carregar dados: {e}")
-        st.info("Verifique se as views existem no BigQuery")
+    else:
+        st.warning("Sem dados disponíveis no BigQuery")
 
 else:
     st.error("Não foi possível conectar ao BigQuery")
-    st.info("Configure as credenciais do Google Cloud")
+    st.info("Configure as credenciais do Google Cloud nos Secrets do Streamlit Cloud")
