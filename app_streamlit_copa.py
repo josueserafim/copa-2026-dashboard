@@ -1,10 +1,6 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
-import plotly.express as px
 from google.cloud import bigquery
-from datetime import datetime
-import os
 
 # ==========================
 # CONFIGURAÇÃO STREAMLIT
@@ -146,7 +142,7 @@ if client:
         df_fase = carregar_dados_fase(client)
         
         # ==========================
-        # KPI CARDS (TOP)
+        # KPI CARDS
         # ==========================
         col1, col2, col3, col4 = st.columns(4)
         
@@ -202,15 +198,13 @@ if client:
         
         # Aplicar filtros
         df_filtrado = df_impacto.copy()
-        
         if fase_selecionada != 'Todos':
             df_filtrado = df_filtrado[df_filtrado['fase'] == fase_selecionada]
-        
         if tipo_selecionado != 'Todos':
             df_filtrado = df_filtrado[df_filtrado['tipo'] == tipo_selecionado]
         
         # ==========================
-        # TAB 1: IMPACTO POR JOGO
+        # ABAS
         # ==========================
         tab1, tab2, tab3, tab4 = st.tabs(
             ["Impacto por Jogo", "Série Temporal", "Comparativo", "Dados Detalhados"]
@@ -219,33 +213,14 @@ if client:
         with tab1:
             st.markdown("### Impacto dos Jogos na Plataforma")
             
-            # Gráfico de Barras - Top 15 piores
+            # Top 15 piores
             df_top = df_filtrado.nlargest(15, 'variacao_pct')
             
-            fig_barras = px.bar(
-                df_top,
-                x='variacao_pct',
-                y='confronto',
-                orientation='h',
-                color='eh_brasil',
-                color_discrete_map={True: '#FFD700', False: '#3498DB'},
-                hover_data=['data_jogo', 'hora_jogo', 'fase', 'usuarios_jogo', 'usuarios_controle'],
-                title="Top 15 Jogos com Maior Impacto",
-                labels={
-                    'variacao_pct': 'Variação (%)',
-                    'confronto': 'Confronto',
-                    'eh_brasil': 'Brasil'
-                }
+            # Gráfico de barras com Streamlit
+            st.bar_chart(
+                data=df_top.set_index('confronto')['variacao_pct'],
+                height=500
             )
-            
-            fig_barras.update_layout(
-                height=500,
-                template='plotly_dark',
-                hovermode='y unified',
-                margin=dict(l=150)
-            )
-            
-            st.plotly_chart(fig_barras, use_container_width=True)
             
             # Estatísticas
             col1, col2, col3 = st.columns(3)
@@ -273,54 +248,24 @@ if client:
         with tab2:
             st.markdown("### Evolução de Usuários - Série Temporal")
             
-            # Gráfico de Linha
-            fig_linha = px.line(
-                df_serie,
-                x='data',
-                y='usuarios',
-                color='tem_jogo_brasil',
-                hover_data=['usuarios', 'jogos_do_dia'],
-                title="Acesso Diário à Plataforma",
-                labels={
-                    'data': 'Data',
-                    'usuarios': 'Usuários',
-                    'tem_jogo_brasil': 'Brasil Jogando'
-                }
-            )
-            
-            fig_linha.update_layout(
-                height=500,
-                template='plotly_dark',
-                hovermode='x unified'
-            )
-            
-            st.plotly_chart(fig_linha, use_container_width=True)
+            # Gráfico de linha com Streamlit
+            if not df_serie.empty:
+                st.line_chart(
+                    data=df_serie.set_index('data')[['usuarios']],
+                    height=500
+                )
+            else:
+                st.warning("Sem dados de série temporal disponíveis")
         
         with tab3:
             st.markdown("### Brasil vs Outros Países")
             
-            # Gráfico Comparativo
-            fig_comparacao = px.bar(
-                df_comparacao,
-                x='tipo_jogo',
-                y='impacto_medio_pct',
-                color='tipo_jogo',
-                color_discrete_map={'🇧🇷 Brasil Joga': '#FFD700', '⚽ Outros Países': '#3498DB'},
-                hover_data=['total_jogos', 'desvio_padrao', 'melhor_resultado', 'pior_resultado'],
-                title="Comparação: Impacto Médio Brasil vs Outros",
-                labels={
-                    'tipo_jogo': 'Tipo',
-                    'impacto_medio_pct': 'Impacto Médio (%)'
-                }
-            )
-            
-            fig_comparacao.update_layout(
-                height=400,
-                template='plotly_dark',
-                showlegend=False
-            )
-            
-            st.plotly_chart(fig_comparacao, use_container_width=True)
+            # Gráfico de barras comparativo
+            if not df_comparacao.empty:
+                st.bar_chart(
+                    data=df_comparacao.set_index('tipo_jogo')['impacto_medio_pct'],
+                    height=400
+                )
             
             # Tabela comparativa
             st.dataframe(
@@ -352,7 +297,7 @@ if client:
             st.download_button(
                 label="Download CSV",
                 data=csv,
-                file_name=f"copa_2026_analise_{datetime.now().strftime('%Y%m%d')}.csv",
+                file_name=f"copa_2026_analise.csv",
                 mime="text/csv"
             )
         
@@ -363,8 +308,7 @@ if client:
         st.markdown("""
             <div style="text-align: center; color: #888888; padding: 20px;">
                 <p>Dashboard de Inteligência Artificial | Iônica - Editora FTD</p>
-                <p>Última atualização: """ + datetime.now().strftime("%d/%m/%Y %H:%M:%S") + """</p>
-                <p>Dados: 104 jogos da Copa 2026 | Análise de impacto em plataforma educacional</p>
+                <p>Dados: 102 jogos da Copa 2026 | Análise de impacto em plataforma educacional</p>
             </div>
         """, unsafe_allow_html=True)
         
