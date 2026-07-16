@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 from google.cloud import bigquery
-import json
+import plotly.graph_objects as go
+import plotly.express as px
 
 # ==========================
 # CONFIGURAÇÃO STREAMLIT
@@ -94,13 +95,9 @@ def carregar_dados_serie_temporal(_client):
             data,
             sessoes,
             usuarios,
-            duracao_media_minutos,
-            jogos_do_dia,
-            fases,
-            tem_jogo_brasil,
-            quantidade_jogos_dia
+            duracao_media_minutos
         FROM `analytics-bigquery-321918.ionica_gold.v_copa_serie_temporal`
-        ORDER BY data DESC
+        ORDER BY data
         """
         return _client.query(query).to_dataframe()
     except Exception as e:
@@ -129,29 +126,6 @@ def carregar_dados_comparacao(_client):
         st.warning(f"Erro ao carregar comparação: {e}")
         return pd.DataFrame()
 
-@st.cache_data(ttl=3600)
-def carregar_dados_fase(_client):
-    """Carrega resumo por fase"""
-    if _client is None:
-        return pd.DataFrame()
-    
-    try:
-        query = """
-        SELECT 
-            fase,
-            total_jogos,
-            impacto_medio_pct,
-            melhor_impacto,
-            pior_impacto,
-            variacao_stddev
-        FROM `analytics-bigquery-321918.ionica_gold.v_copa_resumo_por_fase`
-        ORDER BY impacto_medio_pct DESC
-        """
-        return _client.query(query).to_dataframe()
-    except Exception as e:
-        st.warning(f"Erro ao carregar fase: {e}")
-        return pd.DataFrame()
-
 # ==========================
 # LAYOUT PRINCIPAL
 # ==========================
@@ -173,7 +147,6 @@ if client:
     df_impacto = carregar_dados_impacto(client)
     df_serie = carregar_dados_serie_temporal(client)
     df_comparacao = carregar_dados_comparacao(client)
-    df_fase = carregar_dados_fase(client)
     
     # ==========================
     # KPI CARDS
@@ -249,15 +222,27 @@ if client:
         with tab1:
             st.markdown("### Impacto dos Jogos na Plataforma")
             
-            # Top 15 piores
+            # Top 15 maiores impactos
             df_top = df_filtrado.nlargest(15, 'variacao_pct')
             
-            # Gráfico de barras com Streamlit
             if not df_top.empty:
-                st.bar_chart(
-                    data=df_top.set_index('confronto')['variacao_pct'],
-                    height=500
+                # Gráfico Plotly interativo
+                fig = px.bar(
+                    df_top,
+                    x='variacao_pct',
+                    y='confronto',
+                    orientation='h',
+                    color='variacao_pct',
+                    color_continuous_scale='RdYlGn',
+                    labels={'variacao_pct': 'Variação (%)', 'confronto': 'Jogo'},
+                    title='Top 15 Jogos com Maior Impacto'
                 )
+                fig.update_layout(
+                    height=600,
+                    template='plotly_dark',
+                    showlegend=False
+                )
+                st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("Sem dados para exibir com os filtros selecionados")
             
@@ -287,28 +272,53 @@ if client:
         with tab2:
             st.markdown("### Evolução de Usuários - Série Temporal")
             
-            # Gráfico de linha com Streamlit
             if not df_serie.empty:
-                st.line_chart(
-                    data=df_serie.set_index('data')[['usuarios']],
-                    height=500
+                # Gráfico Plotly com linha
+                fig = px.line(
+                    df_serie,
+                    x='data',
+                    y='usuarios',
+                    title='Número de Usuários ao Longo do Tempo',
+                    labels={'data': 'Data', 'usuarios': 'Usuários'}
                 )
+                fig.update_layout(
+                    height=500,
+                    template='plotly_dark',
+                    hovermode='x unified'
+                )
+                st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("Sem dados de série temporal disponíveis")
         
         with tab3:
             st.markdown("### Brasil vs Outros Países")
             
-            # Gráfico de barras comparativo
+            # Gráfico Plotly de barras comparativo
             if not df_comparacao.empty:
-                st.bar_chart(
-                    data=df_comparacao.set_index('tipo_jogo')['impacto_medio_pct'],
-                    height=400
+                fig = px.bar(
+                    df_comparacao,
+                    x='tipo_jogo',
+                    y='impacto_medio_pct',
+                    color='tipo_jogo',
+                    color_discrete_map={'Brasil Joga': '#FFD700', 'Outros Países': '#4169E1'},
+                    title='Comparação: Impacto Médio Brasil vs Outros Países',
+                    labels={'tipo_jogo': 'Tipo de Jogo', 'impacto_medio_pct': 'Impacto Médio (%)'}
                 )
+                fig.update_layout(
+                    height=400,
+                    template='plotly_dark',
+                    showlegend=False
+                )
+                st.plotly_chart(fig, use_container_width=True)
             
             # Tabela comparativa
             st.dataframe(
-                df_comparacao.style.format({'impacto_medio_pct': '{:.1f}%', 'desvio_padrao': '{:.1f}%'}),
+                df_comparacao.style.format({
+                    'impacto_medio_pct': '{:.1f}%',
+                    'desvio_padrao': '{:.1f}%',
+                    'melhor_resultado': '{:.1f}%',
+                    'pior_resultado': '{:.1f}%'
+                }),
                 use_container_width=True
             )
         
