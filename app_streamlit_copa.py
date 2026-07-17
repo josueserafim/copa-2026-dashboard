@@ -191,28 +191,23 @@ if client:
             
             with col1:
                 impacto_medio = df_impacto['variacao_pct'].mean()
-                st.metric(
-                    "Impacto Médio",
-                    f"{impacto_medio:.1f}%",
-                    delta=f"{impacto_medio:.1f}%",
-                    delta_color="inverse"
-                )
+                st.metric("Impacto Médio", f"{impacto_medio:.1f}%")
+                if impacto_medio < 0:
+                    st.caption("↓ Queda média de acessos durante os jogos")
+                elif impacto_medio > 0:
+                    st.caption("↑ Aumento médio de acessos durante os jogos")
+                else:
+                    st.caption("Sem variação média")
             
             with col2:
                 total_jogos = len(df_impacto)
-                st.metric(
-                    "Total de Jogos",
-                    f"{total_jogos}",
-                    delta="Analisados"
-                )
+                st.metric("Total de Jogos", f"{total_jogos}")
+                st.caption("Analisados")
             
             with col3:
                 jogos_brasil = df_impacto[df_impacto['eh_brasil'] == True].shape[0]
-                st.metric(
-                    "Jogos do Brasil",
-                    f"{jogos_brasil}",
-                    delta=f"{(jogos_brasil/total_jogos*100):.0f}%"
-                )
+                st.metric("Jogos do Brasil", f"{jogos_brasil}")
+                st.caption(f"{(jogos_brasil/total_jogos*100):.0f}% do total")
             
             with col4:
                 if not df_comparacao.empty:
@@ -221,11 +216,8 @@ if client:
                     
                     if len(impacto_brasil) > 0 and len(impacto_outros) > 0:
                         diferenca = abs(impacto_brasil[0] - impacto_outros[0])
-                        st.metric(
-                            "Diferença Brasil vs Outros",
-                            f"{diferenca:.1f}%",
-                            delta=f"Brasil: {impacto_brasil[0]:.1f}%"
-                        )
+                        st.metric("Diferença Brasil vs Outros", f"{diferenca:.1f}%")
+                        st.caption(f"Brasil: {impacto_brasil[0]:.1f}%")
             
             # Explicação dos KPIs (Dropdown)
             with st.expander("📖 Como ler os indicadores", expanded=False):
