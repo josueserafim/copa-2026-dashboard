@@ -5,6 +5,7 @@ import plotly.express as px
 from google.cloud import bigquery
 from datetime import datetime
 import os
+import json
 
 # ==========================
 # CONFIGURAÇÃO STREAMLIT
@@ -44,17 +45,24 @@ st.markdown("""
 # ==========================
 @st.cache_resource
 def conectar_bigquery():
-    """Conecta ao BigQuery usando Secrets do Streamlit"""
+    """Conecta ao BigQuery usando credentials.json local ou Secrets"""
     try:
-        # Tenta ler do Streamlit Secrets primeiro
-        if "gcp_service_account" in st.secrets:
+        # Tenta ler credentials.json da pasta local PRIMEIRO
+        if os.path.exists('credentials.json'):
+            st.info("Usando credentials.json local")
+            return bigquery.Client.from_service_account_json('credentials.json')
+        # Se não houver arquivo local, tenta Streamlit Secrets
+        elif "gcp_service_account" in st.secrets:
+            st.info("Usando Secrets do Streamlit Cloud")
             creds_dict = dict(st.secrets["gcp_service_account"])
             return bigquery.Client.from_service_account_info(creds_dict)
         else:
             # Fallback: tenta usar credenciais do ambiente
+            st.info("Usando credenciais do ambiente")
             return bigquery.Client(project="analytics-bigquery-321918")
     except Exception as e:
         st.error(f"Erro ao conectar BigQuery: {e}")
+        st.warning("Certifique-se de que credentials.json está na mesma pasta do script!")
         return None
 
 @st.cache_data(ttl=3600)
@@ -193,9 +201,9 @@ if client:
                 impacto_medio = df_impacto['variacao_pct'].mean()
                 st.metric("Impacto Médio", f"{impacto_medio:.1f}%")
                 if impacto_medio < 0:
-                    st.caption("↓ Queda média de acessos durante os jogos")
+                    st.caption("Queda média de acessos durante os jogos")
                 elif impacto_medio > 0:
-                    st.caption("↑ Aumento médio de acessos durante os jogos")
+                    st.caption("Aumento médio de acessos durante os jogos")
                 else:
                     st.caption("Sem variação média")
             
@@ -216,13 +224,17 @@ if client:
                     
                     if len(impacto_brasil) > 0 and len(impacto_outros) > 0:
                         diferenca = abs(impacto_brasil[0] - impacto_outros[0])
-                        st.metric("Diferença Brasil vs Outros", f"{diferenca:.1f}%")
-                        st.caption(f"Brasil: {impacto_brasil[0]:.1f}%")
+                        st.metric(
+                            "Diferença Brasil vs Outros",
+                            f"{diferenca:.1f}%"
+                        )
             
             # Explicação dos KPIs (Dropdown)
-            with st.expander("📖 Como ler os indicadores", expanded=False):
+            with st.expander("Como ler os indicadores", expanded=False):
                 st.markdown("""
-                **Impacto Médio:** Variação percentual média dos acessos durante todos os jogos analisados. Valores positivos = mais usuários, negativos = menos usuários.
+                **Impacto Médio:** Variação percentual média dos acessos durante todos os jogos analisados. 
+                - Valores NEGATIVOS = Menos usuários durante os jogos (esperado - competição com transmissão)
+                - Valores POSITIVOS = Mais usuários durante os jogos (conteúdo Copa atraindo)
 
                 **Total de Jogos:** Quantidade total de partidas da Copa 2026 que tiveram seus dados analisados.
 
@@ -256,7 +268,7 @@ if client:
                 df_filtrado = df_filtrado[df_filtrado['tipo'] == tipo_selecionado]
             
             # ==========================
-            # TAB 1: IMPACTO POR JOGO
+            # TABS
             # ==========================
             tab1, tab2, tab3, tab4 = st.tabs(
                 ["Impacto por Jogo", "Série Temporal", "Comparativo", "Dados Detalhados"]
@@ -265,7 +277,7 @@ if client:
             with tab1:
                 st.markdown("### Impacto dos Jogos na Plataforma")
                 
-                # Gráfico de Barras - Top 15 piores
+                # Gráfico de Barras - Top 15
                 df_top = df_filtrado.nlargest(15, 'variacao_pct')
                 
                 fig_barras = px.bar(
@@ -294,15 +306,18 @@ if client:
                 st.plotly_chart(fig_barras, use_container_width=True)
                 
                 # Explicação do gráfico (Dropdown)
-                with st.expander("📖 Como ler este gráfico", expanded=False):
+                with st.expander("Como ler este gráfico", expanded=False):
                     st.markdown("""
-                    **Eixo Horizontal (Variação %):** Mostra a variação percentual de usuários durante o jogo. Valores positivos indicam AUMENTO de acessos, negativos indicam DIMINUIÇÃO.
+                    **Eixo Horizontal (Variação %):** Mostra a variação percentual de usuários durante o jogo.
+                    - Valores NEGATIVOS = MENOS acessos durante o jogo (esperado - concorrência com transmissão)
+                    - Valores POSITIVOS = MAIS acessos durante o jogo (conteúdo Copa atraindo usuários)
 
                     **Cores:** 
-                    - 🟨 Amarelo = Jogos com Brasil
-                    - 🔵 Azul = Jogos entre outros países
+                    - Amarelo = Jogos com Brasil
+                    - Azul = Jogos entre outros países
 
-                    **Barra mais longa:** Maior impacto (positivo ou negativo) nos acessos à plataforma.
+                    **Barra mais longa para a esquerda (negativa):** Maior queda de usuários durante o jogo.
+                    **Barra mais longa para a direita (positiva):** Maior aumento de usuários durante o jogo.
 
                     **Interatividade:** Passe o mouse sobre as barras para ver data, hora, fase e número de usuários.
                     """)
@@ -312,18 +327,14 @@ if client:
                 col1, col2, col3 = st.columns(3)
                 
                 with col1:
-                    st.metric(
-                        "Maior Impacto Positivo",
-                        f"{df_filtrado['variacao_pct'].max():.1f}%",
-                        f"{df_filtrado.loc[df_filtrado['variacao_pct'].idxmax(), 'confronto']}"
-                    )
+                    linha_min = df_filtrado.loc[df_filtrado['variacao_pct'].idxmin()]
+                    st.metric("Maior Queda", f"{linha_min['variacao_pct']:.1f}%")
+                    st.caption(linha_min['confronto'])
                 
                 with col2:
-                    st.metric(
-                        "Maior Impacto Negativo",
-                        f"{df_filtrado['variacao_pct'].min():.1f}%",
-                        f"{df_filtrado.loc[df_filtrado['variacao_pct'].idxmin(), 'confronto']}"
-                    )
+                    linha_max = df_filtrado.loc[df_filtrado['variacao_pct'].idxmax()]
+                    st.metric("Maior Aumento", f"{linha_max['variacao_pct']:.1f}%")
+                    st.caption(linha_max['confronto'])
                 
                 with col3:
                     st.metric(
@@ -331,11 +342,11 @@ if client:
                         f"{df_filtrado['variacao_pct'].std():.1f}%"
                     )
                 
-                with st.expander("📖 O que significam essas métricas", expanded=False):
+                with st.expander("O que significam essas métricas", expanded=False):
                     st.markdown("""
-                    **Maior Impacto Positivo:** O jogo que MAIS aumentou os acessos à plataforma.
+                    **Maior Queda:** O jogo que MAIS diminuiu os acessos à plataforma (competição com transmissão do jogo).
 
-                    **Maior Impacto Negativo:** O jogo que MAIS diminuiu os acessos à plataforma (competição com transmissão).
+                    **Maior Aumento:** O jogo que MAIS aumentou os acessos (conteúdo Copa-relacionado atraindo usuários).
 
                     **Desvio Padrão:** Mede a variabilidade dos impactos. 
                     - Valores altos = impactos muito diferentes entre jogos
@@ -369,7 +380,7 @@ if client:
                     
                     st.plotly_chart(fig_linha, use_container_width=True)
                     
-                    with st.expander("📖 Como ler este gráfico", expanded=False):
+                    with st.expander("Como ler este gráfico", expanded=False):
                         st.markdown("""
                         **Eixo Horizontal (Data):** Período de análise da Copa 2026.
 
@@ -378,8 +389,8 @@ if client:
                         **Cores da linha:** Diferentes cores indicam dias com (azul claro) e sem (azul escuro) jogos do Brasil.
 
                         **Picos e quedas:** 
-                        - Picos = dias com alta demanda (geralmente durante jogos)
-                        - Quedas = períodos de baixa demanda
+                        - Picos = dias com mais acesso
+                        - Quedas = dias com menos acesso (geralmente durante/após jogos)
 
                         **Tendência geral:** A linha mostra se o engajamento está crescendo, caindo ou se mantendo estável ao longo do tempo.
                         """)
@@ -413,17 +424,17 @@ if client:
                     
                     st.plotly_chart(fig_comparacao, use_container_width=True)
                     
-                    with st.expander("📖 Como ler este gráfico", expanded=False):
+                    with st.expander("Como ler este gráfico", expanded=False):
                         st.markdown("""
                         **Comparação direta:** Mostra qual tipo de jogo (Brasil ou Outros) tem maior impacto médio nos acessos.
 
-                        **Barra mais alta:** Tipo de jogo com maior impacto médio positivo.
+                        **Barra mais baixa (mais negativa):** Maior queda de acessos durante estes jogos.
 
                         **Número de jogos:** Passe o mouse para ver quantos jogos de cada tipo foram analisados.
 
                         **Interpretação:** 
-                        - Se Brasil > Outros = jogos do Brasil geram mais engajamento
-                        - Se Outros > Brasil = outros jogos têm mais efeito
+                        - Se Brasil tem queda MAIOR = jogos do Brasil afastam mais usuários (mais audiência de TV)
+                        - Se Outros tem queda MAIOR = outros jogos afastam mais usuários
                         """)
                     
                     # Tabela comparativa
@@ -454,7 +465,7 @@ if client:
                     height=500
                 )
                 
-                with st.expander("📖 Explicação das colunas", expanded=False):
+                with st.expander("Explicação das colunas", expanded=False):
                     st.markdown("""
                     **Data/Hora do Jogo:** Quando a partida ocorreu.
 
@@ -464,17 +475,19 @@ if client:
 
                     **Tipo:** Se foi jogo do Brasil ou de Outros Países.
 
-                    **Usuários Jogo:** Quantidade de usuários durante o horário do jogo.
+                    **Usuários Jogo:** Quantidade de usuários durante o dia do jogo.
 
-                    **Usuários Controle:** Usuários no dia anterior (para comparação baseline).
+                    **Usuários Controle:** Usuários no mesmo dia da semana da semana anterior (baseline).
 
-                    **Variação %:** Percentual de diferença entre dia do jogo e dia de controle.
+                    **Variação %:** Percentual de diferença entre dia do jogo e baseline.
+                    - Negativo = Menos usuários durante o jogo
+                    - Positivo = Mais usuários durante o jogo
                     """)
                 
                 # Download CSV
                 csv = df_exibicao.to_csv(index=False)
                 st.download_button(
-                    label="📥 Download CSV",
+                    label="Download CSV",
                     data=csv,
                     file_name=f"copa_2026_analise_{datetime.now().strftime('%Y%m%d')}.csv",
                     mime="text/csv"
@@ -498,4 +511,6 @@ if client:
 
 else:
     st.error("Não foi possível conectar ao BigQuery")
-    st.info("Configure as credenciais do Google Cloud nos Secrets do Streamlit Cloud")
+    st.warning("Certifique-se de que:")
+    st.warning("1. credentials.json está na mesma pasta que este script")
+    st.warning("2. OU as credenciais estão configuradas nos Secrets do Streamlit Cloud")
